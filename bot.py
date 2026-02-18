@@ -1,3 +1,22 @@
+import os
+import logging
+import asyncio
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from groq import Groq
+
+# Настройка логирования
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Токены и ключи из переменных окружения
+TELEGRAM_TOKEN = os.environ.get("BOT_TOKEN")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+
+# Инициализация Groq
+client = Groq(api_key=GROQ_API_KEY)
+
+# СИСТЕМНЫЙ ПРОМПТ (вставь сюда свой новый промпт, который я написала ранее)
 SYSTEM_PROMPT = """
 ТЫ — Ева, персональный карьерный ассистент в Telegram-боте @RezumeProBot. Твоя задача — продавать услуги по созданию резюме и подготовке к собеседованиям, собирать данные и генерировать документы.
 
@@ -179,19 +198,88 @@ Soft skills: {soft_skills}
 3. Кратко: «Запустил продукт X (+15% к выручке)»
 Какой вариант лучше отражает Ваш вклад?"
 """
-if __name__ == "__main__":
-    main()
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /start"""
+    await update.message.reply_text(
+        "Здравствуйте! 👋 Я — AI Resume Pro, Ваш персональный карьерный ассистент Ева.\n\n"
+        "За 1–30 минут и 700 ₽ я создам для Вас:\n"
+        "📄 Резюме, которое пройдёт любой автоматический отбор (ATS)\n"
+        "✉️ Сопроводительное письмо под конкретную вакансию\n"
+        "🎯 Всё в современном стиле 2026 — с цифрами, результатами и без шаблонов\n\n"
+        "💰 Почему Вам это стоит попробовать прямо сейчас:\n"
+        "• Не понравится — верну деньги\n"
+        "• Не пройдёт ATS — переделаю бесплатно\n"
+        "• Задержу дольше 30 минут — просто напишите мне в чат и напомните\n\n"
+        "Готовы начать?"
+    )
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик текстовых сообщений"""
+    user_message = update.message.text
+    user_name = update.message.from_user.first_name
+    
+    try:
+        # Отправляем запрос к Groq
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"Имя клиента: {user_name}\nСообщение: {user_message}"}
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=1000
+        )
+        
+        reply = chat_completion.choices[0].message.content
+        await update.message.reply_text(reply)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обращении к Groq: {e}")
+        await update.message.reply_text(
+            "Извините, временные проблемы с подключением. Попробуйте позже или напишите /start"
+        )
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /help"""
+    help_text = """
+Доступные команды:
+/start - Начать работу
+/help - Показать эту справку
+    """
+    await update.message.reply_text(help_text)
+
+async def run_bot():
+    """Запуск бота с правильным event loop"""
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    
+    logger.info("Бот запущен и готов к работе!")
+    
+    # Держим бота запущенным
+    while True:
+        await asyncio.sleep(3600)
+
 def main():
     """Запуск бота"""
     if not TELEGRAM_TOKEN:
-        logger.error("Не задан BOT_TOKEN")
+        logger.error("❌ Не задан BOT_TOKEN")
         return
     if not GROQ_API_KEY:
-        logger.error("Не задан GROQ_API_KEY")
+        logger.error("❌ Не задан GROQ_API_KEY")
         return
     
+    logger.info("✅ Запускаем бота...")
     # Запускаем асинхронную функцию
     asyncio.run(run_bot())
 
+# ⚠️ ЭТО САМОЕ ВАЖНОЕ - ТОЧКА ВХОДА ⚠️
 if __name__ == "__main__":
     main()
