@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from groq import Groq
@@ -102,6 +103,26 @@ async def contacts(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📱 Поддержка: @support_username"
     )
 
+async def run_bot():
+    """Запуск бота с правильным event loop"""
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("prices", prices))
+    application.add_handler(CommandHandler("contacts", contacts))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    
+    logger.info("Бот запущен и готов к работе!")
+    
+    # Держим бота запущенным
+    while True:
+        await asyncio.sleep(3600)
+
 def main():
     """Запуск бота"""
     if not TELEGRAM_TOKEN:
@@ -111,19 +132,8 @@ def main():
         logger.error("Не задан GROQ_API_KEY")
         return
     
-    # Создаем приложение
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
-    
-    # Добавляем обработчики
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("prices", prices))
-    application.add_handler(CommandHandler("contacts", contacts))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    # Запускаем бота
-    logger.info("Бот запущен и готов к работе!")
-    application.run_polling()
+    # Запускаем асинхронную функцию
+    asyncio.run(run_bot())
 
 if __name__ == "__main__":
     main()
