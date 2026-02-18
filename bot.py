@@ -181,3 +181,17 @@ Soft skills: {soft_skills}
 """
 if __name__ == "__main__":
     main()
+def main():
+    """Запуск бота"""
+    if not TELEGRAM_TOKEN:
+        logger.error("Не задан BOT_TOKEN")
+        return
+    if not GROQ_API_KEY:
+        logger.error("Не задан GROQ_API_KEY")
+        return
+    
+    # Запускаем асинхронную функцию
+    asyncio.run(run_bot())
+
+if __name__ == "__main__":
+    main()
