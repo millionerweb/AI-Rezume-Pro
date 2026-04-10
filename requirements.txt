@@ -1,2 +1,5 @@
-python-telegram-bot==21.11
-groq==0.14.0
+pyTelegramBotAPI
+groq
+yoomoney
+flask
+gunicorn
