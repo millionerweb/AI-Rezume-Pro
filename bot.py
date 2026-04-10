@@ -18,7 +18,7 @@ WALLET = os.environ.get("WALLET")
 ADMIN_CHAT_ID = int(os.environ.get("ADMIN_CHAT_ID", 0))
 PRICE = int(os.environ.get("PRICE", 700))
 
-# Проверка наличия токенов
+# Проверка наличия обязательных переменных
 if not TELEGRAM_TOKEN or not GROQ_API_KEY or not YOOMONEY_TOKEN or not WALLET:
     raise ValueError("Не заданы обязательные переменные окружения")
 
@@ -26,14 +26,12 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN)
 client = Groq(api_key=GROQ_API_KEY)
 yoo_client = Client(YOOMONEY_TOKEN)
 
-# Flask для healthcheck (чтобы Render видел, что приложение живо)
 app = Flask(__name__)
 
 @app.route('/')
 def health():
     return "Bot is running", 200
 
-# Логирование
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -134,6 +132,7 @@ def bonus_keyboard():
     return markup
 
 # --- ОБРАБОТЧИКИ КОМАНД ---
+
 @bot.message_handler(commands=['start'])
 def start_handler(message):
     chat_id = message.chat.id
@@ -214,6 +213,7 @@ def back_handler(message):
         if mode == "resume":
             step = session.get("step", 0)
             if step > 0:
+                # Не удаляем данные для шагов опыта (2) и навыков (3)
                 if step - 1 not in (2, 3):
                     keys = list(session["data"].keys())
                     if keys:
@@ -346,14 +346,12 @@ def callback_query(call):
             bot.answer_callback_query(call.id, "Сессия не активна. Напишите /start заново.", show_alert=True)
     bot.answer_callback_query(call.id)
 
-# Запуск бота в отдельном потоке, а Flask в основном
+# --- ЗАПУСК ---
 def run_bot():
     bot.infinity_polling()
 
 if __name__ == "__main__":
-    # Запускаем бота в фоне
     bot_thread = threading.Thread(target=run_bot)
     bot_thread.daemon = True
     bot_thread.start()
-    # Запускаем Flask для healthcheck
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
